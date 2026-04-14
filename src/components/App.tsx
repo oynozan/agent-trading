@@ -7,7 +7,7 @@ import { OutputPane } from "./OutputPane.js";
 import { InputPrompt } from "./InputPrompt.js";
 import { Editor } from "./Editor.js";
 import { parseInput } from "../cli/parser.js";
-import { getCommand, getCommandNames, isDeleteResult, isEditResult } from "../commands/index.js";
+import { getCommand, getCommandNames, isInteractiveResult, type PendingPrompt } from "../commands/index.js";
 import { listAgents } from "../services/agent.service.js";
 import { log } from "../utils/logger.js";
 import { getAgentsRoot } from "../utils/fs.js";
@@ -19,12 +19,6 @@ const WELCOME_LINES = [
   "",
 ];
 
-interface PendingConfirm {
-  prompt: string;
-  onConfirm: () => Promise<string[]>;
-  onCancel: () => string[];
-}
-
 interface EditorFile {
   path: string;
   name: string;
@@ -35,7 +29,7 @@ export function App() {
   const { rows } = useWindowSize();
   const [lines, setLines] = useState<string[]>(WELCOME_LINES);
   const [stats, setStats] = useState<AgentStats>({ total: 0, active: 0, idle: 0 });
-  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -94,17 +88,11 @@ export function App() {
 
   const handleSubmit = useCallback(
     async (input: string) => {
-      if (pendingConfirm) {
-        const isYes = input.trim().toLowerCase() === "y";
-        if (isYes) {
-          const result = await pendingConfirm.onConfirm();
-          appendLines(...result);
-        } else {
-          const result = pendingConfirm.onCancel();
-          appendLines(...result);
-        }
-        setPendingConfirm(null);
-        await refreshStats();
+      if (pendingPrompt) {
+        const { lines: resultLines, nextPrompt } = await pendingPrompt.onResponse(input);
+        if (resultLines.length > 0) appendLines(...resultLines);
+        setPendingPrompt(nextPrompt ?? null);
+        if (!nextPrompt) await refreshStats();
         return;
       }
 
@@ -148,16 +136,11 @@ export function App() {
       try {
         const result = await handler(parsed.args);
 
-        if (isDeleteResult(result)) {
+        if (isInteractiveResult(result)) {
           appendLines(...result.lines);
-          if (result.needsConfirmation) {
-            setPendingConfirm(result.needsConfirmation);
+          if (result.prompt) {
+            setPendingPrompt(result.prompt);
           }
-          return;
-        }
-
-        if (isEditResult(result)) {
-          appendLines(...result.lines);
           if (result.openEditor) {
             setEditorFile({ path: result.openEditor.filePath, name: result.openEditor.fileName });
           }
@@ -171,7 +154,7 @@ export function App() {
 
       await refreshStats();
     },
-    [pendingConfirm, appendLines, refreshStats, exit]
+    [pendingPrompt, appendLines, refreshStats, exit]
   );
 
   const termHeight = rows || process.stdout.rows || 24;
@@ -205,7 +188,7 @@ export function App() {
       <OutputPane lines={lines} height={outputHeight} scrollOffset={scrollOffset} />
       <InputPrompt
         onSubmit={handleSubmit}
-        confirmPrompt={pendingConfirm?.prompt ?? null}
+        confirmPrompt={pendingPrompt?.prompt ?? null}
         history={historyRef.current}
         suggestions={suggestions}
       />

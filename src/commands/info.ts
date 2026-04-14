@@ -12,15 +12,23 @@ export async function infoCommand(args: string[]): Promise<string[]> {
     const config = await getAgent(name);
     const statusColor = config.status === "idle" ? chalk.green : chalk.yellow;
 
-    return [
+    const lines = [
       log.blank(),
       log.raw(`  ${chalk.cyan("[o_o]")}  ${chalk.cyanBright.bold(config.name)}`),
       log.blank(),
       log.raw(`  ${chalk.dim("Status")}   ${statusColor(config.status)}`),
       log.raw(`  ${chalk.dim("Created")}  ${chalk.white(config.createdAt.split("T")[0])}`),
       log.raw(`  ${chalk.dim("Full TS")}  ${chalk.dim(config.createdAt)}`),
-      log.blank(),
     ];
+
+    if (config.walletAddress) {
+      lines.push(log.raw(`  ${chalk.dim("Wallet")}   ${chalk.white(config.walletAddress)}`));
+    } else {
+      lines.push(log.raw(`  ${chalk.dim("Wallet")}   ${chalk.dim("none")}`));
+    }
+
+    lines.push(log.blank());
+    return lines;
   } catch (err) {
     return [log.error((err as Error).message)];
   }

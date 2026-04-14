@@ -16,6 +16,7 @@ export interface AgentConfig {
   name: string;
   createdAt: string;
   status: "idle" | "active";
+  walletAddress?: string;
 }
 
 const NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9-]*$/;
@@ -99,6 +100,13 @@ export async function deleteAgent(name: string): Promise<void> {
     throw new Error(`Agent "${name}" not found.`);
   }
   await removeDir(dir);
+}
+
+export async function updateAgentConfig(name: string, updates: Partial<AgentConfig>): Promise<AgentConfig> {
+  const config = await getAgent(name);
+  const updated = { ...config, ...updates };
+  await writeJson(join(getAgentDir(name), "config.json"), updated);
+  return updated;
 }
 
 export function getTradeLogPath(name: string): string {

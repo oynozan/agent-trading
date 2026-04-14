@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const AGENTS_DIR = ".agents-cli";
+const WALLETS_DIR = "wallets";
 
 export function getAgentsRoot(): string {
   return join(homedir(), AGENTS_DIR);
@@ -10,6 +11,14 @@ export function getAgentsRoot(): string {
 
 export function getAgentDir(name: string): string {
   return join(getAgentsRoot(), name);
+}
+
+export function getWalletsDir(): string {
+  return join(getAgentsRoot(), WALLETS_DIR);
+}
+
+export function getWalletPath(name: string): string {
+  return join(getWalletsDir(), `${name}.json`);
 }
 
 export async function ensureDir(dirPath: string): Promise<void> {

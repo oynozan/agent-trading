@@ -53,7 +53,7 @@ export function InputPrompt({
   }, []);
 
   const handleSubmit = (value: string) => {
-    if (value.trim()) {
+    if (!confirmPrompt && value.trim()) {
       history.push(value.trim());
     }
     history.reset();

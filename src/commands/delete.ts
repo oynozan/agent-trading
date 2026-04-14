@@ -1,17 +1,10 @@
 import chalk from "chalk";
 import { deleteAgent, getAgent } from "../services/agent.service.js";
+import { walletExists } from "../services/wallet.service.js";
 import { log } from "../utils/logger.js";
+import type { InteractiveResult } from "./index.js";
 
-export interface DeleteResult {
-  lines: string[];
-  needsConfirmation?: {
-    prompt: string;
-    onConfirm: () => Promise<string[]>;
-    onCancel: () => string[];
-  };
-}
-
-export async function deleteCommand(args: string[]): Promise<DeleteResult> {
+export async function deleteCommand(args: string[]): Promise<InteractiveResult> {
   const name = args[0];
   if (!name) {
     return { lines: [log.error("Usage: delete <name>")] };
@@ -27,17 +20,24 @@ export async function deleteCommand(args: string[]): Promise<DeleteResult> {
 
   return {
     lines: [],
-    needsConfirmation: {
+    prompt: {
       prompt,
-      onConfirm: async () => {
+      onResponse: async (input: string) => {
+        if (input.trim().toLowerCase() !== "y") {
+          return { lines: [log.dim("  Cancelled.")] };
+        }
         try {
           await deleteAgent(name);
-          return [log.success(`Agent ${chalk.cyanBright(name)} deleted.`)];
+          const hasWallet = await walletExists(name);
+          const lines = [log.success(`Agent ${chalk.cyanBright(name)} deleted.`)];
+          if (hasWallet) {
+            lines.push(log.dim("  Wallet data preserved."));
+          }
+          return { lines };
         } catch (err) {
-          return [log.error((err as Error).message)];
+          return { lines: [log.error((err as Error).message)] };
         }
       },
-      onCancel: () => [log.dim("  Cancelled.")],
     },
   };
 }
