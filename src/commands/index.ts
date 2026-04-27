@@ -4,6 +4,8 @@ import { infoCommand } from "./info.js";
 import { editCommand } from "./edit.js";
 import { deleteCommand } from "./delete.js";
 import { helpCommand } from "./help.js";
+import { nodeCommand } from "./node.js";
+import { roomsCommand } from "./rooms.js";
 
 export interface PendingPrompt {
   prompt: string;
@@ -27,6 +29,8 @@ const commands: Record<string, CommandHandler> = {
   info: infoCommand,
   edit: editCommand,
   delete: deleteCommand,
+  node: nodeCommand,
+  rooms: () => roomsCommand(),
   help: () => helpCommand(),
 };
 

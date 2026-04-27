@@ -17,6 +17,10 @@ export function getWalletsDir(): string {
   return join(getAgentsRoot(), WALLETS_DIR);
 }
 
+export function getCliConfigPath(): string {
+  return join(getAgentsRoot(), "config.json");
+}
+
 export function getWalletPath(name: string): string {
   return join(getWalletsDir(), `${name}.json`);
 }

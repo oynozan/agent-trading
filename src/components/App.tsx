@@ -2,13 +2,19 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, useApp, useInput, useWindowSize } from "ink";
 import chalk from "chalk";
 
-import { StatusBar, type AgentStats } from "./StatusBar.js";
+import { StatusBar, type AgentStats, type NodeStatus } from "./StatusBar.js";
 import { OutputPane } from "./OutputPane.js";
 import { InputPrompt } from "./InputPrompt.js";
 import { Editor } from "./Editor.js";
 import { parseInput } from "../cli/parser.js";
 import { getCommand, getCommandNames, isInteractiveResult, type PendingPrompt } from "../commands/index.js";
 import { listAgents } from "../services/agent.service.js";
+import {
+  loadCliConfig,
+  fetchNodeConfig,
+  setCachedNodeConfig,
+  type NodeConfig,
+} from "../services/config.service.js";
 import { log } from "../utils/logger.js";
 import { getAgentsRoot } from "../utils/fs.js";
 import { CommandHistory } from "../utils/history.js";
@@ -26,13 +32,16 @@ interface EditorFile {
 
 export function App() {
   const { exit } = useApp();
-  const { rows } = useWindowSize();
+  const { rows, columns } = useWindowSize();
   const [lines, setLines] = useState<string[]>(WELCOME_LINES);
   const [stats, setStats] = useState<AgentStats>({ total: 0, active: 0, idle: 0 });
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [nodeUrl, setNodeUrl] = useState<string>("");
+  const [nodeStatus, setNodeStatus] = useState<NodeStatus>("loading");
+  const [nodeRoomCount, setNodeRoomCount] = useState<number>(0);
 
   const historyRef = useRef(new CommandHistory());
 
@@ -61,6 +70,45 @@ export function App() {
   useEffect(() => {
     refreshStats();
   }, [refreshStats]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cfg = await loadCliConfig();
+      if (cancelled) return;
+      setNodeUrl(cfg.nodeUrl);
+
+      try {
+        const fetched: NodeConfig = await fetchNodeConfig(cfg.nodeUrl);
+        if (cancelled) return;
+        setCachedNodeConfig(fetched);
+        setNodeRoomCount(fetched.rooms.length);
+        setNodeStatus("online");
+        setLines((prev) => [
+          ...prev,
+          log.dim(
+            `  Connected to ${cfg.nodeUrl} | ${fetched.rooms.length} room${fetched.rooms.length === 1 ? "" : "s"}`
+          ),
+          "",
+        ]);
+      } catch (err) {
+        if (cancelled) return;
+        setCachedNodeConfig(null);
+        setNodeRoomCount(0);
+        setNodeStatus("offline");
+        setLines((prev) => [
+          ...prev,
+          log.warn((err as Error).message),
+          log.dim('  Use "node set <url>" to point at a node.'),
+          "",
+        ]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const appendLines = useCallback((...newLines: string[]) => {
     setLines((prev) => [...prev, ...newLines]);
@@ -158,13 +206,14 @@ export function App() {
   );
 
   const termHeight = rows || process.stdout.rows || 24;
+  const termWidth = columns || process.stdout.columns || 80;
   const statusBarHeight = 4;
   const inputHeight = 1;
   const outputHeight = Math.max(1, termHeight - statusBarHeight - inputHeight);
 
   if (editorFile) {
     return (
-      <Box flexDirection="column" height={termHeight}>
+      <Box flexDirection="column" height={termHeight} width={termWidth}>
         <Editor
           filePath={editorFile.path}
           fileName={editorFile.name}
@@ -183,8 +232,13 @@ export function App() {
   }
 
   return (
-    <Box flexDirection="column" height={termHeight}>
-      <StatusBar stats={stats} />
+    <Box flexDirection="column" height={termHeight} width={termWidth}>
+      <StatusBar
+        stats={stats}
+        nodeStatus={nodeStatus}
+        nodeUrl={nodeUrl}
+        nodeRoomCount={nodeRoomCount}
+      />
       <OutputPane lines={lines} height={outputHeight} scrollOffset={scrollOffset} />
       <InputPrompt
         onSubmit={handleSubmit}

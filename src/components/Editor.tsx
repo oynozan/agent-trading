@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { readFile, writeFile } from "node:fs/promises";
-import chalk from "chalk";
 
 interface EditorProps {
   filePath: string;
@@ -54,7 +53,7 @@ export function Editor({ filePath, fileName, height, onSave, onCancel }: EditorP
       return;
     }
 
-    if (key.escape) {
+    if (key.escape || (key.ctrl && input === "c")) {
       onCancel();
       return;
     }
@@ -274,10 +273,10 @@ export function Editor({ filePath, fileName, height, onSave, onCancel }: EditorP
     <Box flexDirection="column" height={height}>
       <Box borderStyle="single" borderColor="yellow" paddingX={1} flexShrink={0}>
         <Text color="yellow" bold>
-          EDIT: {fileName}{modFlag}
+          {"EDIT: "}{fileName}{modFlag}{"   "}
         </Text>
         <Box flexGrow={1} />
-        <Text dimColor>Ctrl+S save | Esc cancel</Text>
+        <Text dimColor>{"Ctrl+S save  |  Esc/Ctrl+C cancel"}</Text>
       </Box>
 
       <Box flexDirection="column" flexGrow={1} overflow="hidden">

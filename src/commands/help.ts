@@ -7,6 +7,9 @@ const COMMANDS: [string, string][] = [
   ["info <name>", "Show agent details"],
   ["edit <name>", "Open trade.md in built-in editor"],
   ["delete <name>", "Delete an agent"],
+  ["node", "Show current node URL and status"],
+  ["node set <url>", "Point CLI at a node and refresh config"],
+  ["rooms", "List rooms delivered by the connected node"],
   ["dir", "Show agents directory path"],
   ["clear", "Clear the output pane"],
   ["help", "Show this help message"],
@@ -33,13 +36,15 @@ export async function helpCommand(): Promise<string[]> {
   }
 
   lines.push(log.blank());
-  lines.push(log.heading("  Keyboard Shortcuts"));
-  lines.push(log.blank());
+  
+  // lines.push(log.heading("  Keyboard Shortcuts"));
+  // lines.push(log.blank());
 
-  for (const [key, desc] of SHORTCUTS) {
-    lines.push(log.raw(`  ${chalk.yellow(key.padEnd(20))} ${desc}`));
-  }
+  // for (const [key, desc] of SHORTCUTS) {
+  //   lines.push(log.raw(`  ${chalk.yellow(key.padEnd(20))} ${desc}`));
+  // }
 
-  lines.push(log.blank());
+  // lines.push(log.blank());
+  
   return lines;
 }
