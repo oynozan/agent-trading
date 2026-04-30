@@ -10,6 +10,7 @@ const COMMANDS: [string, string][] = [
   ["node", "Show current node URL and status"],
   ["node set <url>", "Point CLI at a node and refresh config"],
   ["rooms", "List rooms delivered by the connected node"],
+  ["settings", "Open interactive settings (provider, model, API key, platform)"],
   ["dir", "Show agents directory path"],
   ["clear", "Clear the output pane"],
   ["help", "Show this help message"],

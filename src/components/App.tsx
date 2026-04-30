@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Box, useApp, useInput, useWindowSize } from "ink";
 import chalk from "chalk";
 
@@ -6,6 +6,7 @@ import { StatusBar, type AgentStats, type NodeStatus } from "./StatusBar.js";
 import { OutputPane } from "./OutputPane.js";
 import { InputPrompt } from "./InputPrompt.js";
 import { Editor } from "./Editor.js";
+import { SettingsScreen } from "./SettingsScreen.js";
 import { parseInput } from "../cli/parser.js";
 import { getCommand, getCommandNames, isInteractiveResult, type PendingPrompt } from "../commands/index.js";
 import { listAgents } from "../services/agent.service.js";
@@ -18,12 +19,7 @@ import {
 import { log } from "../utils/logger.js";
 import { getAgentsRoot } from "../utils/fs.js";
 import { CommandHistory } from "../utils/history.js";
-
-const WELCOME_LINES = [
-  "",
-  chalk.dim('  Type "help" to get started.'),
-  "",
-];
+import { getRandomTip } from "../utils/tips.js";
 
 interface EditorFile {
   path: string;
@@ -33,10 +29,22 @@ interface EditorFile {
 export function App() {
   const { exit } = useApp();
   const { rows, columns } = useWindowSize();
-  const [lines, setLines] = useState<string[]>(WELCOME_LINES);
+
+  const welcomeLines = useMemo(
+    () => [
+      "",
+      chalk.dim('  Type "help" to get started.'),
+      "  " + chalk.yellow.bold("Tip:") + " " + chalk.cyan(getRandomTip()),
+      "",
+    ],
+    [],
+  );
+
+  const [lines, setLines] = useState<string[]>(welcomeLines);
   const [stats, setStats] = useState<AgentStats>({ total: 0, active: 0, idle: 0 });
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [nodeUrl, setNodeUrl] = useState<string>("");
@@ -78,31 +86,53 @@ export function App() {
       if (cancelled) return;
       setNodeUrl(cfg.nodeUrl);
 
+      let nodeOk = false;
+      let nodeDetail = "";
+
       try {
         const fetched: NodeConfig = await fetchNodeConfig(cfg.nodeUrl);
         if (cancelled) return;
         setCachedNodeConfig(fetched);
         setNodeRoomCount(fetched.rooms.length);
         setNodeStatus("online");
-        setLines((prev) => [
-          ...prev,
-          log.dim(
-            `  Connected to ${cfg.nodeUrl} | ${fetched.rooms.length} room${fetched.rooms.length === 1 ? "" : "s"}`
-          ),
-          "",
-        ]);
-      } catch (err) {
+        nodeOk = true;
+        nodeDetail = `${cfg.nodeUrl} | ${fetched.rooms.length} room${fetched.rooms.length === 1 ? "" : "s"}`;
+      } catch {
         if (cancelled) return;
         setCachedNodeConfig(null);
         setNodeRoomCount(0);
         setNodeStatus("offline");
-        setLines((prev) => [
-          ...prev,
-          log.warn((err as Error).message),
-          log.dim('  Use "node set <url>" to point at a node.'),
-          "",
-        ]);
+        nodeDetail = `Run "node set <url>" to connect (was ${cfg.nodeUrl}).`;
       }
+
+      if (cancelled) return;
+
+      const labelCol = (s: string) => chalk.cyan.bold(s.padEnd(10));
+      const statusCol = (s: string, color: "green" | "yellow" | "red") =>
+        chalk[color](s.padEnd(10));
+
+      const apiOk = !!cfg.apiKey;
+      const apiRow =
+        "    " +
+        labelCol("API Key") +
+        (apiOk
+          ? statusCol("set", "green")
+          : statusCol("not set", "yellow") + chalk.dim('Run "settings" to add one.'));
+
+      const nodeRow =
+        "    " +
+        labelCol("Node") +
+        (nodeOk
+          ? statusCol("online", "green") + chalk.dim(nodeDetail)
+          : statusCol("offline", "red") + chalk.dim(nodeDetail));
+
+      setLines((prev) => [
+        ...prev,
+        chalk.cyanBright.bold("  Status"),
+        apiRow,
+        nodeRow,
+        "",
+      ]);
     })();
 
     return () => {
@@ -131,7 +161,7 @@ export function App() {
         setScrollOffset((prev) => Math.max(prev - 5, 0));
       }
     },
-    { isActive: !editorFile }
+    { isActive: !editorFile && !settingsOpen }
   );
 
   const handleSubmit = useCallback(
@@ -192,6 +222,9 @@ export function App() {
           if (result.openEditor) {
             setEditorFile({ path: result.openEditor.filePath, name: result.openEditor.fileName });
           }
+          if (result.openSettings) {
+            setSettingsOpen(true);
+          }
           return;
         }
 
@@ -225,6 +258,21 @@ export function App() {
           onCancel={() => {
             setEditorFile(null);
             appendLines(log.dim("  Edit cancelled."));
+          }}
+        />
+      </Box>
+    );
+  }
+
+  if (settingsOpen) {
+    return (
+      <Box flexDirection="column" height={termHeight} width={termWidth}>
+        <SettingsScreen
+          height={termHeight}
+          width={termWidth}
+          onClose={() => {
+            setSettingsOpen(false);
+            appendLines(log.dim("  Settings closed."));
           }}
         />
       </Box>

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "ink";
 
 const VERSION = "0.1.0";
